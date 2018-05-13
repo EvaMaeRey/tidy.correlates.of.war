@@ -1,0 +1,116 @@
+# Towards "tidy" IGO data
+
+Recognizing the painstaking work has resulted in IGO dataset, this file is aimed at creating a so-called ["tidy" version of the data](http://vita.had.co.nz/papers/tidy-data.html). Such a version of the data should facilitate ease of use with R "tidyverse tools".  The resulting data has a few components. 1) a data frame with one IGO per row,  containing only attributes about the IGO 2) a data frame with country-year-igo as the row - with membership coded 3) a data frame containing countries and a small set of attributes.  These component data frames are saved in one .Rdata file.  
+
+Note: saving the country-year-igo data as an array might also a light-weight option.  Then we could flatten the array into a dataframe upon loading the data.  
+
+Note: Another attractive way to store country-igo relationship data would be to record the start and end of membership. This information seems not to be directly available, and it would not be precise given that memberships were only recorded every 5 years before 1965.  
+
+
+
+
+## county-year-igo long form
+
+```{r tidy IGO data, message=F}
+list.files("raw_data")
+
+library(printr)
+library(tidyverse)
+IGO_stateunit_v2.3 <- read_csv("raw_data/IGO_stateunit_v2.3.zip") 
+
+# Make dataframe of countries and country characteristics for those included in IGO data. 
+countries = 
+  IGO_stateunit_v2.3 %>% 
+  group_by(ccode, state) %>% 
+  summarise() %>% 
+  dplyr::rename(cown = ccode) 
+
+IGO_igounit_v2.3 <- read_csv("raw_data/IGO_igounit_v2.3.zip")
+
+# Category
+#  
+# Numerical Value
+# No Membership
+# 0
+# Full Membership
+# 1
+# Associate Membership
+# 2
+# Observer
+# 3
+# Missing data
+# -9
+# State Not System Member
+# -1
+
+# create igo-country-year data frame recording membership information
+igo_country_year = IGO_igounit_v2.3 %>% 
+  dplyr::select(ioname, year, afghanistan:zimbabwe) %>% 
+  gather(key = "state", value = "status", - year, - ioname) %>% 
+  filter(status != -1) %>% # keep only meaningful cases
+  mutate(status = recode(status,  
+                         "0"= "No Membership",  
+                         "1"= "Full Membership",
+                         "2" = "Associate Membership",
+                         "3" = "Observer",
+                         "-9" = "Missing data"
+                         )) %>% 
+  mutate(status = factor(status)) %>% 
+  mutate(state = factor(state)) %>% 
+  mutate(ioname = factor(ioname)) %>% 
+  left_join(countries) %>% select(- state)
+
+```
+
+
+Note: membership is coded only every five years prior to 1965; there is a sdate and dead_date variable that records the year that the IGO comes into existance. 
+
+```{r}
+
+# In addition to these basic membership variables, version 2.1a of the data contains additional
+# variables pertaining to the organizations. dead: those organizations that simply cease operations receive a “1” in the year in which the
+# termination occurs. 
+igos = IGO_igounit_v2.3 %>%  
+  group_by(ioname, orgname) %>% 
+  summarise(year_start = as.integer(mean(sdate)),
+            year_termination = mean(deaddate))
+
+# additional dataset for IGO year? 
+# sometimes IGO names...  "integrated", "replaced", "igocode", "ionum", "longorgname"
+# igo_year = 
+
+# Note: there are two Eastern Caribb. Central Bank
+# the org name is the same but considered separate in IGO data.
+# the key is ioname
+# this region coding is original, and rough and shouldn't be included in the tidy data. - move to later step. 
+
+igos$region = "no region assigned"
+igos$region[str_detect(igos$orgname, "Afr")] = "Africa"
+igos$region[str_detect(igos$orgname, "Asia")] = "Asia/Pacific"
+igos$region[str_detect(igos$orgname, "Pacific")] = "Asia/Pacific"
+igos$region[str_detect(igos$orgname, "Euro")] = "Europe"
+igos$region[str_detect(igos$orgname, "America")] = "Americas"
+igos$region[str_detect(igos$orgname, "Am.")] = "Americas"
+igos$region[str_detect(igos$orgname, "Inter-Am")] = "Americas"
+igos$region[str_detect(igos$orgname, "Pan-Am")] = "Americas"
+igos$region[str_detect(igos$orgname, "Latin Am")] = "Americas"
+igos$region[str_detect(igos$orgname, "L/A")] = "Americas"
+igos$region[str_detect(igos$orgname, "Carib")] = "Americas"
+igos$region[str_detect(igos$orgname, "Arab")] = "Arab or Middle East"
+igos$region[str_detect(igos$orgname, "Gulf")] = "Arab or Middle East"
+igos$region[str_detect(igos$orgname, "Gulf")] = "Arab or Middle East"
+igos$region[str_detect(igos$orgname, "Baltic")] = "Europe"
+igos$region[str_detect(igos$orgname, "Benelux")] = "Europe"
+igos$region[str_detect(igos$orgname, "Rhine")] = "Europe"
+# igos$region[str_detect(igos$orgname, "Atlantic")] = "Atlantic"
+# igos$region[str_detect(igos$orgname, "North Pac")] = "Pacific"
+igos$region[str_detect(igos$orgname, "Nordic")] = "Europe"
+igos$region[str_detect(igos$orgname, "Danube")] = "Europe"
+igos
+
+save(list = c("igos", "countries", "igo_country_year"), file = "data_products/tidy_igo_v2.3.Rdata")
+file.info("data_products/tidy_igo_v2.3.Rdata")$size
+file.info("raw_data/IGO_stateunit_v2.3.zip")$size # unzipped is 11 M
+file.info("raw_data/IGO_igounit_v2.3.zip")$size # unzipped is 8 M
+```
+
