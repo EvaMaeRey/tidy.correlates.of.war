@@ -1,0 +1,19 @@
+
+
+```{r}
+library(tidyverse)
+library(countrycode)
+
+countries = read_csv("raw_data/cow_country_codes.csv") %>% 
+  rename(cowc = StateAbb) %>% 
+  rename(cown = CCode) %>% 
+  rename(cow_state_name = StateNme) %>% 
+  group_by(cowc, cown, cow_state_name) %>%
+  summarise() %>% ungroup() %>% 
+  mutate(continent = countrycode(cown, "cown", "continent"))%>% 
+  mutate(iso3c = countrycode(cown, "cown", "iso3c"))
+
+save(countries, file = "data_products/countries.Rdata")
+
+```
+
