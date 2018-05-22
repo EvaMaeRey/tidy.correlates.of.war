@@ -1,0 +1,62 @@
+---
+title: "tidy raw data"
+author: "Gina"
+date: "October 14, 2015"
+output: pdf_document
+---
+
+
+
+```{r}
+library(foreign)
+library(dplyr)
+library(lubridate)
+setwd("raw_data/version4.1_dta")
+
+files=list.files(pattern = "dta")
+
+file.info(files)
+```
+```{r}
+alliance_v4.1_by_member_0 = read.dta("raw_data/version4.1_dta/alliance_v4.1_by_member.dta") 
+names(alliance_v4.1_by_member_0)
+
+alliance_v4.1_by_member = alliance_v4.1_by_member_0 %>% 
+  rename(alliance_id = version4id) %>% 
+  mutate(alliance_start_date = 
+           as_date(paste(all_st_year, all_st_month, all_st_day, sep = "-")))%>% 
+  mutate(alliance_end_date = 
+           as_date(paste(all_end_year, all_end_month, all_end_day, sep = "-")))%>%
+  mutate(member_start_date = 
+           as_date(paste(mem_st_year, mem_st_month, mem_st_day, sep = "-"))) %>% 
+  mutate(member_end_date = 
+           as_date(paste(mem_end_year, mem_end_month, mem_end_day, sep = "-"))) %>% 
+    dplyr::select(-all_st_year, -all_st_month, -all_st_day, 
+                -mem_st_year, -mem_st_month, -mem_st_day,
+                -all_end_year, -all_end_month, -all_end_day,
+                
+                -mem_end_year, -mem_end_month, -mem_end_day)
+names(alliance_v4.1_by_member)
+
+# country information is from COW unique countries list 
+
+alliances <- alliance_v4.1_by_member %>% 
+  group_by(alliance_id, ss_type, alliance_start_date, alliance_end_date) %>% 
+  summarise() %>% ungroup()
+dim(alliances)
+
+alliance_country_membership <- alliance_v4.1_by_member %>% 
+  group_by(alliance_id, ccode, member_start_date, member_end_date, 
+           defense, neutrality, nonaggression, entente) %>% 
+  summarise() %>% ungroup() %>% 
+  rename(cown = ccode)
+dim(alliance_country_membership)
+dim(alliance_v4.1_by_member)
+save(list = c("alliances", "alliance_country_membership"), 
+     file = "data_products/tidy_alliance_v4.Rdata")
+
+file.info("data_products/tidy_alliance_v4.Rdata")$size
+file.info("raw_data/version4.1_dta/alliance_v4.1_by_member.dta")$size
+```
+
+
